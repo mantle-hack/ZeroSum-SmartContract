@@ -31,7 +31,7 @@ contract ZeroSumHardcoreMystery is ReentrancyGuard, Ownable {
     struct Game {
         uint256 gameId;
         GameMode mode;
-        uint256 actualNumber;       // ✅ ALWAYS 0 - Never reveals true number
+        uint256 actualNumber;       // ALWAYS 0 - Never reveals true number
         address currentPlayer;
         GameStatus status;
         uint256 entryFee;
@@ -52,13 +52,13 @@ contract ZeroSumHardcoreMystery is ReentrancyGuard, Ownable {
     
    
     
-    // ✅ ULTRA PRIVATE storage - completely hidden from Etherscan!
+    //ULTRA PRIVATE storage - completely hidden from Etherscan!
     mapping(uint256 => uint256) private secretNumbers;
     mapping(uint256 => uint256) private remainingNumbers;
     mapping(uint256 => uint256) private displayMinRange;
     mapping(uint256 => uint256) private displayMaxRange;
     
-    // ✅ Custom salt for maximum security
+    // Custom salt for maximum security
     uint256 private constant SALT = 0x2222333344445555666677778888999900001111aaaabbbbccccddddeeeeffff;
     
     // Core mappings
@@ -80,10 +80,10 @@ contract ZeroSumHardcoreMystery is ReentrancyGuard, Ownable {
     uint256 public platformFee = 5;
     uint256 public fees;
     uint256 public timeLimit = 300;
-    uint256 public maxStrikes = 2;  // ✅ 2 timeouts = elimination
+    uint256 public maxStrikes = 2;  // 2 timeouts = elimination
     bool public paused;
     
-    // ✅ Spectator integration
+    //Spectator integration
     address public spectatorContract;
     
     // Actual range constants (hidden)
@@ -116,7 +116,7 @@ contract ZeroSumHardcoreMystery is ReentrancyGuard, Ownable {
         spectatorContract = _spectator;
     }
     
-    // ✅ View function for spectators to verify game state
+    // View function for spectators to verify game state
     function getGameForSpectators(uint256 _id) external view returns (
         GameStatus status,
         address winner,

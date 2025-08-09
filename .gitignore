@@ -1,3 +1,7 @@
 out/
 cache/
 .env
+
+/out
+/cache
+.env

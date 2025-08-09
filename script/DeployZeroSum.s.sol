@@ -8,13 +8,13 @@ import {ZeroSumSimplified} from "../src/ZeroSumSimplified.sol";
 import {ZeroSumSpectator} from "../src/ZeroSumSpectator.sol";
 import {ZeroSumTournament} from "../src/ZeroSumTournament.sol";
 
-contract DeployZeroSum is Script {
+contract DeployZeroSumScript is Script {
     ZeroSumHardcoreMystery public zeroSumHardCoreMystery;
 
     function setUp() public {}
 
     function run() public {
-        uint128 privateKey = uint128(vm.envUint("PRIVATE_KEY"));
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(privateKey);
 
         zeroSumHardCoreMystery = new ZeroSumHardcoreMystery();

@@ -17,20 +17,20 @@ contract DeployZeroSumScript is Script {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(privateKey);
 
-        zeroSumHardCoreMystery = new ZeroSumHardcoreMystery();
-        console.log("hard core contract address ::: ", address(zeroSumHardCoreMystery));
+        // zeroSumHardCoreMystery = new ZeroSumHardcoreMystery();
+        // console.log("hard core contract address ::: ", address(zeroSumHardCoreMystery));
 
-        ZeroSumPureMystery zeroSumPureMystery = new ZeroSumPureMystery();
-        console.log("pure contract address ::: ", address(zeroSumPureMystery));
+        // ZeroSumPureMystery zeroSumPureMystery = new ZeroSumPureMystery();
+        // console.log("pure contract address ::: ", address(zeroSumPureMystery));
 
-        ZeroSumSimplified zeroSumSimplified = new ZeroSumSimplified();
-        console.log("simplified contract address ::: ", address(zeroSumSimplified));
+        // ZeroSumSimplified zeroSumSimplified = new ZeroSumSimplified();
+        // console.log("simplified contract address ::: ", address(zeroSumSimplified));
 
         ZeroSumSpectator zeroSumSpectator = new ZeroSumSpectator();
         console.log("spectator contract address ::: ", address(zeroSumSpectator));
 
-        ZeroSumTournament zeroSumTournament = new ZeroSumTournament();
-        console.log("tournament contract address ::: ", address(zeroSumTournament));
+        // ZeroSumTournament zeroSumTournament = new ZeroSumTournament();
+        // console.log("tournament contract address ::: ", address(zeroSumTournament));
 
         vm.stopBroadcast();
     }

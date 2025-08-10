@@ -4,4 +4,8 @@ out = "out"
 libs = ["lib"]
 
 auto_detect_remappings = true
+
+# [profile.default.optimizer]
+# enabled = true
+# runs = 200
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ZeroSumTournament - ULTRA OPTIMIZED UNDER 24KB
- * @dev Tournament management with True Mystery variants - size optimized
+ * @dev Tournament management - size optimized
  */
 contract ZeroSumTournament is ReentrancyGuard, Ownable {
     enum Status {
@@ -18,7 +18,6 @@ contract ZeroSumTournament is ReentrancyGuard, Ownable {
     enum Mode {
         QUICK_DRAW,
         STRATEGIC,
-        PURE_MYSTERY,
         HARDCORE_MYSTERY,
         LAST_STAND
     }
@@ -72,9 +71,7 @@ contract ZeroSumTournament is ReentrancyGuard, Ownable {
     }
 
     function _createDefaults() internal {
-        _create("Mystery Masters", 0.1 ether, 32, Mode.PURE_MYSTERY, 3);
-        _create("Hardcore Cup", 0.5 ether, 16, Mode.HARDCORE_MYSTERY, 2);
-        _create("Last Stand", 0.05 ether, 64, Mode.LAST_STAND, 4);
+        _create("Hardcore Cup", 0.001 ether, 4, Mode.HARDCORE_MYSTERY, 24);
     }
 
     // ================== CREATION ==================

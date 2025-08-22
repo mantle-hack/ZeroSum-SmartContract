@@ -34,20 +34,49 @@ contract ZeroSumSpectator is ReentrancyGuard, Ownable {
         uint256 amount;
         bool claimed;
         address gameContract;
+        uint256 timestamp;
     }
 
+    struct UserBetInfo {
+        bool hasBet;
+        address predictedWinner;
+        uint256 amount;
+        bool claimed;
+        uint256 timestamp;
+    }
+
+    struct GameBettingSummary {
+        uint256 totalBetAmount;
+        uint256 numberOfBets;
+        bool bettingAllowed;
+        address[] uniqueBettors;
+        mapping(address => uint256) playerBetCounts;
+        address[] playersWithBets;
+    }
+
+    // ✅ ENHANCED MAPPINGS FOR BETTER USER TRACKING
     mapping(bytes32 => Bet[]) public gameBets;
     mapping(bytes32 => mapping(address => uint256)) public totalBetsOnPlayer;
     mapping(bytes32 => uint256) public totalGameBets;
     mapping(address => uint256) public spectatorBalances;
     mapping(bytes32 => bool) public bettingClosed;
     mapping(address => bool) public registeredContracts;
+    
+    // ✅ NEW: Track user betting per game
+    mapping(bytes32 => mapping(address => UserBetInfo)) public userGameBets;
+    mapping(bytes32 => address[]) public gameBettors; // List of all users who bet on a game
+    mapping(address => bytes32[]) public userBettingHistory; // All games a user has bet on
+    mapping(bytes32 => mapping(address => uint256)) public userBetCount; // How many bets user placed on specific game
+    
+    // ✅ NEW: Quick lookup for player betting stats
+    mapping(bytes32 => address[]) public playersInGame;
+    mapping(bytes32 => mapping(address => address[])) public playerBettors; // Who bet on each player
 
     uint256 public bettingFeePercent = 3;
     uint256 public minimumBet = 0.01 ether;
     bool public globalBettingEnabled = true;
 
-    event BetPlaced(address indexed gameContract, uint256 indexed gameId, address indexed bettor, uint256 amount);
+    event BetPlaced(address indexed gameContract, uint256 indexed gameId, address indexed bettor, uint256 amount, address predictedWinner);
     event BetsClaimed(address indexed gameContract, uint256 indexed gameId, address indexed bettor, uint256 winnings);
     event BettingClosed(address indexed gameContract, uint256 indexed gameId);
 
@@ -78,20 +107,29 @@ contract ZeroSumSpectator is ReentrancyGuard, Ownable {
         }
     }
 
+    // ✅ ENHANCED: Place bet with better tracking
     function placeBet(address _gameContract, uint256 _gameId, address _predictedWinner) external payable nonReentrant {
         require(msg.value >= minimumBet, "Bet too low");
         require(isBettingAllowed(_gameContract, _gameId), "Betting not allowed");
 
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        
+        // ✅ Check if user already bet on this game
+        require(!userGameBets[gameKey][msg.sender].hasBet, "Already bet on this game");
+
         bool validPlayer = false;
+        address[] memory players;
+        
         try IZeroSumGame(_gameContract).getGameForSpectators(_gameId) returns (
             GameStatus status,
             address, /* winner */
-            address[] memory players,
+            address[] memory _players,
             uint256, /* currentNumber */
             bool, /* numberGenerated */
             address, /* currentPlayer */
             uint256 /* mode */
         ) {
+            players = _players;
             for (uint256 i = 0; i < players.length; i++) {
                 if (players[i] == _predictedWinner) {
                     validPlayer = true;
@@ -104,27 +142,173 @@ contract ZeroSumSpectator is ReentrancyGuard, Ownable {
             revert("Cannot verify game");
         }
 
-        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        // ✅ Store players in game if not already stored
+        if (playersInGame[gameKey].length == 0) {
+            for (uint256 i = 0; i < players.length; i++) {
+                playersInGame[gameKey].push(players[i]);
+            }
+        }
 
-        gameBets[gameKey].push(
-            Bet({
-                bettor: msg.sender,
-                gameId: _gameId,
-                predictedWinner: _predictedWinner,
-                amount: msg.value,
-                claimed: false,
-                gameContract: _gameContract
-            })
-        );
+        // ✅ Create and store bet
+        Bet memory newBet = Bet({
+            bettor: msg.sender,
+            gameId: _gameId,
+            predictedWinner: _predictedWinner,
+            amount: msg.value,
+            claimed: false,
+            gameContract: _gameContract,
+            timestamp: block.timestamp
+        });
 
+        gameBets[gameKey].push(newBet);
+
+        // ✅ Update user betting info
+        userGameBets[gameKey][msg.sender] = UserBetInfo({
+            hasBet: true,
+            predictedWinner: _predictedWinner,
+            amount: msg.value,
+            claimed: false,
+            timestamp: block.timestamp
+        });
+
+        // ✅ Add to tracking arrays
+        gameBettors[gameKey].push(msg.sender);
+        userBettingHistory[msg.sender].push(gameKey);
+        userBetCount[gameKey][msg.sender]++;
+        playerBettors[gameKey][_predictedWinner].push(msg.sender);
+
+        // ✅ Update totals
         totalBetsOnPlayer[gameKey][_predictedWinner] += msg.value;
         totalGameBets[gameKey] += msg.value;
 
-        emit BetPlaced(_gameContract, _gameId, msg.sender, msg.value);
+        emit BetPlaced(_gameContract, _gameId, msg.sender, msg.value, _predictedWinner);
     }
 
+    // ✅ NEW: Check if user has bet on specific game
+    function hasUserBetOnGame(address _gameContract, uint256 _gameId, address _user) external view returns (bool) {
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        return userGameBets[gameKey][_user].hasBet;
+    }
+
+    // ✅ NEW: Get user's bet info for specific game
+    function getUserBetInfo(address _gameContract, uint256 _gameId, address _user) 
+        external 
+        view 
+        returns (
+            bool hasBet,
+            address predictedWinner,
+            uint256 amount,
+            bool claimed,
+            uint256 timestamp
+        ) 
+    {
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        UserBetInfo memory betInfo = userGameBets[gameKey][_user];
+        
+        return (
+            betInfo.hasBet,
+            betInfo.predictedWinner,
+            betInfo.amount,
+            betInfo.claimed,
+            betInfo.timestamp
+        );
+    }
+
+    // ✅ NEW: Get all users who bet on a game
+    function getGameBettors(address _gameContract, uint256 _gameId) external view returns (address[] memory) {
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        return gameBettors[gameKey];
+    }
+
+    // ✅ NEW: Get all users who bet on specific player
+    function getPlayerBettors(address _gameContract, uint256 _gameId, address _player) external view returns (address[] memory) {
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        return playerBettors[gameKey][_player];
+    }
+
+    // ✅ NEW: Get user's betting history
+    function getUserBettingHistory(address _user) external view returns (bytes32[] memory) {
+        return userBettingHistory[_user];
+    }
+
+    // ✅ NEW: Get user's betting history with details
+    function getUserBettingHistoryDetailed(address _user, uint256 _limit) 
+        external 
+        view 
+        returns (
+            bytes32[] memory gameKeys,
+            address[] memory gameContracts,
+            uint256[] memory gameIds,
+            address[] memory predictedWinners,
+            uint256[] memory amounts,
+            bool[] memory claimed,
+            uint256[] memory timestamps
+        ) 
+    {
+        bytes32[] memory history = userBettingHistory[_user];
+        uint256 length = history.length > _limit ? _limit : history.length;
+        
+        gameKeys = new bytes32[](length);
+        gameContracts = new address[](length);
+        gameIds = new uint256[](length);
+        predictedWinners = new address[](length);
+        amounts = new uint256[](length);
+        claimed = new bool[](length);
+        timestamps = new uint256[](length);
+        
+        for (uint256 i = 0; i < length; i++) {
+            bytes32 gameKey = history[history.length - 1 - i]; // Most recent first
+            UserBetInfo memory betInfo = userGameBets[gameKey][_user];
+            
+            gameKeys[i] = gameKey;
+            // Decode gameKey to get contract and gameId (approximate - for display only)
+            gameContracts[i] = address(0); // Would need additional mapping to decode properly
+            gameIds[i] = 0; // Would need additional mapping to decode properly
+            predictedWinners[i] = betInfo.predictedWinner;
+            amounts[i] = betInfo.amount;
+            claimed[i] = betInfo.claimed;
+            timestamps[i] = betInfo.timestamp;
+        }
+    }
+
+    // ✅ NEW: Get comprehensive game betting stats
+    function getGameBettingStats(address _gameContract, uint256 _gameId) 
+        external 
+        view 
+        returns (
+            uint256 totalBetAmount,
+            uint256 numberOfBets,
+            uint256 numberOfUniqueBettors,
+            bool bettingAllowed,
+            address[] memory players,
+            uint256[] memory playerBetAmounts,
+            uint256[] memory playerBetCounts
+        ) 
+    {
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        
+        totalBetAmount = totalGameBets[gameKey];
+        numberOfBets = gameBets[gameKey].length;
+        numberOfUniqueBettors = gameBettors[gameKey].length;
+        bettingAllowed = isBettingAllowed(_gameContract, _gameId);
+        players = playersInGame[gameKey];
+        
+        playerBetAmounts = new uint256[](players.length);
+        playerBetCounts = new uint256[](players.length);
+        
+        for (uint256 i = 0; i < players.length; i++) {
+            playerBetAmounts[i] = totalBetsOnPlayer[gameKey][players[i]];
+            playerBetCounts[i] = playerBettors[gameKey][players[i]].length;
+        }
+    }
+
+    // ✅ ENHANCED: Claim winnings with better tracking
     function claimBettingWinnings(address _gameContract, uint256 _gameId) external nonReentrant {
         require(registeredContracts[_gameContract], "Not registered");
+
+        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
+        require(userGameBets[gameKey][msg.sender].hasBet, "No bet placed");
+        require(!userGameBets[gameKey][msg.sender].claimed, "Already claimed");
 
         address actualWinner;
         try IZeroSumGame(_gameContract).getGameForSpectators(_gameId) returns (
@@ -143,26 +327,33 @@ contract ZeroSumSpectator is ReentrancyGuard, Ownable {
             revert("Cannot verify");
         }
 
-        uint256 totalWinnings = 0;
-        bytes32 gameKey = _getGameKey(_gameContract, _gameId);
-        Bet[] storage bets = gameBets[gameKey];
+        UserBetInfo storage userBet = userGameBets[gameKey][msg.sender];
+        require(userBet.predictedWinner == actualWinner, "Wrong prediction");
 
+        // Calculate winnings
+        uint256 winnerPool = totalBetsOnPlayer[gameKey][actualWinner];
+        require(winnerPool > 0, "No winning pool");
+        
+        uint256 betShare = (userBet.amount * 10000) / winnerPool;
+        uint256 totalPrizePool = (totalGameBets[gameKey] * (100 - bettingFeePercent)) / 100;
+        uint256 winnings = (totalPrizePool * betShare) / 10000;
+
+        require(winnings > 0, "No winnings");
+
+        // Mark as claimed
+        userBet.claimed = true;
+        
+        // Also update in the gameBets array
+        Bet[] storage bets = gameBets[gameKey];
         for (uint256 i = 0; i < bets.length; i++) {
             if (bets[i].bettor == msg.sender && bets[i].predictedWinner == actualWinner && !bets[i].claimed) {
                 bets[i].claimed = true;
-
-                uint256 winnerPool = totalBetsOnPlayer[gameKey][actualWinner];
-                if (winnerPool > 0) {
-                    uint256 betShare = (bets[i].amount * 10000) / winnerPool;
-                    uint256 totalPrizePool = (totalGameBets[gameKey] * (100 - bettingFeePercent)) / 100;
-                    totalWinnings += (totalPrizePool * betShare) / 10000;
-                }
+                break;
             }
         }
 
-        require(totalWinnings > 0, "No winnings");
-        spectatorBalances[msg.sender] += totalWinnings;
-        emit BetsClaimed(_gameContract, _gameId, msg.sender, totalWinnings);
+        spectatorBalances[msg.sender] += winnings;
+        emit BetsClaimed(_gameContract, _gameId, msg.sender, winnings);
     }
 
     function withdrawSpectatorBalance() external nonReentrant {
@@ -179,6 +370,7 @@ contract ZeroSumSpectator is ReentrancyGuard, Ownable {
         emit BettingClosed(msg.sender, _gameId);
     }
 
+    // Keep compatibility with existing functions
     function enableLastStandBetting(uint256 /* _gameId */ ) external onlyRegisteredContract {}
     function updateLastStandRound(uint256 /* _gameId */ ) external onlyRegisteredContract {}
 

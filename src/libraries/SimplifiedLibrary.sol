@@ -4,9 +4,7 @@ pragma solidity ^0.8.19;
 import {GameStatus, Game, StakingInfo, GameMode} from "../ZeroSumSimplified.sol";
 
 library SimplifiedLibrary {
-    // This library can contain utility functions or shared logic for the ZeroSumSimplified contract.
-    // For example, it could include functions for calculating fees, validating bets, etc.
-
+    
     function calculateBettingFee(uint256 amount, uint256 feePercent) internal pure returns (uint256) {
         return (amount * feePercent) / 100;
     }
@@ -77,8 +75,6 @@ library SimplifiedLibrary {
         s.rewards += pending;
         s.amount -= amount;
         s.lastReward = block.timestamp;
-
-        // payable(msg.sender).transfer(amount);
     }
 
     function _calcRewards(mapping(address => StakingInfo) storage staking) internal {
@@ -95,6 +91,7 @@ library SimplifiedLibrary {
         require(success, "Failed");
     }
 
+    // ✅ FIXED: Prevent double-counting money
     function _createGame(
         GameMode _mode,
         uint256 id,
@@ -105,6 +102,7 @@ library SimplifiedLibrary {
         mapping(address => uint256) storage played,
         mapping(uint256 => uint256) storage turnDeadlines
     ) internal {
+        // ✅ START WITH PRIZE POOL = 0 (no double counting)
         games[id] = Game({
             gameId: id,
             mode: _mode,
@@ -112,17 +110,16 @@ library SimplifiedLibrary {
             currentPlayer: address(0),
             status: GameStatus.WAITING,
             entryFee: msg.value,
-            prizePool: msg.value,
+            prizePool: 0,  // ✅ FIXED: Start at 0, _joinGame will add money
             winner: address(0),
             numberGenerated: false
         });
 
-        // ✅ Reset timeout counters for creator
+        // Reset timeout counters for creator
         playerTimeouts[id][msg.sender] = 0;
 
-        // _joinGame(id, msg.sender);
+        // Join the game (this will add msg.value to prizePool correctly)
         _joinGame(id, msg.sender, games, isInGame, gamePlayers, played, playerTimeouts, turnDeadlines);
-        // emit GameCreated(id, _mode, msg.sender, msg.value);
     }
 
     function _joinGame(
@@ -137,21 +134,21 @@ library SimplifiedLibrary {
     ) internal {
         Game storage g = games[_id];
         require(g.status == GameStatus.WAITING, "Cannot join");
-        // require(!isInGame[_id][_player], "Already in");
-        // require(gamePlayers[_id].length < 2, "Full");
         require(msg.value == g.entryFee, "Wrong fee");
 
+        // ✅ ADD PROPER VALIDATION
+        require(!isInGame[_id][_player], "Already in game");
+        require(gamePlayers[_id].length < 2, "Game is full");
+
         gamePlayers[_id].push(_player);
-        g.prizePool += msg.value;
+        g.prizePool += msg.value;  // ✅ This now correctly adds money only once
         isInGame[_id][_player] = true;
         played[_player]++;
 
-        // ✅ Reset timeout counter for joining player
+        // Reset timeout counter for joining player
         playerTimeouts[_id][_player] = 0;
 
-        // emit PlayerJoined(_id, _player);
-
-        // ✅ GENERATE NUMBER ONLY WHEN BOTH PLAYERS JOIN!
+        // Generate number only when both players join
         if (gamePlayers[_id].length == 2) {
             _startGame(_id, games, gamePlayers, turnDeadlines);
         }
@@ -166,15 +163,13 @@ library SimplifiedLibrary {
         Game storage g = games[_id];
         uint256 timeLimit = 300;
 
-        // ✅ Generate number using BOTH players for fairness
+        // Generate number using both players for fairness
         uint256 startNum = _generateNumber(_id, g.mode, gamePlayers);
         g.currentNumber = startNum;
         g.numberGenerated = true;
         g.status = GameStatus.ACTIVE;
         g.currentPlayer = gamePlayers[_id][0];
         turnDeadlines[_id] = block.timestamp + timeLimit;
-
-        // emit NumberGenerated(_id, startNum);
     }
 
     function _generateNumber(uint256 _id, GameMode _mode, mapping(uint256 => address[]) storage gamePlayers)

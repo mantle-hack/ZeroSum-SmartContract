@@ -1,0 +1,20 @@
+== Logs ==
+  Deploying from address: 0xd2df53D9791e98Db221842Dd085F4144014BBE2a
+  Deployer balance: 29748011416340107
+  Deploying ZeroSumSimplified...
+  ZeroSumSimplified deployed to: 0x5ecc48015485c2d4025a33Df8F5AF79eF5e8B96B
+  Deploying ZeroSumSpectator...
+  ZeroSumSpectator deployed to: 0x1e1A47d93Fb1Fd616bbC1445f9f387C27f3Afc56
+  Registering game contract with spectator...
+  Setting spectator contract in game...
+  === Deployment Summary ===
+  ZeroSumSimplified: 0x5ecc48015485c2d4025a33Df8F5AF79eF5e8B96B
+  ZeroSumSpectator: 0x1e1A47d93Fb1Fd616bbC1445f9f387C27f3Afc56
+  Game counter: 0
+  Platform fee: 5
+  Time limit: 300
+  Spectator contract set: 0x1e1A47d93Fb1Fd616bbC1445f9f387C27f3Afc56
+  Game contract registered: 0x5ecc48015485c2d4025a33Df8F5AF79eF5e8B96B
+  === Copy these addresses for your frontend ===
+  NEXT_PUBLIC_GAME_CONTRACT_ADDRESS= 0x5ecc48015485c2d4025a33Df8F5AF79eF5e8B96B
+  NEXT_PUBLIC_SPECTATOR_CONTRACT_ADDRESS= 0x1e1A47d93Fb1Fd616bbC1445f9f387C27f3Afc56
